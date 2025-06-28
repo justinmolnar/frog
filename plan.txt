@@ -1,0 +1,103 @@
+48-Hour Frog Game Jam: Phased Action Plan (Updated)
+Game: "Tongue-Tied Ascent"
+Current Status: The core mechanics and world system are complete. The initial "get-over-it" concept has evolved into a more flexible, Celeste-like 2D platformer.
+
+Key Design Changes Since Start:
+Jump Mechanic: Evolved from a simple click-to-aim into a more satisfying hold-and-release charge jump.
+
+Tongue Mechanic: Evolved from a simple pendulum swing into a powerful, strategic slingshot launch.
+
+Aiming System: The slingshot aiming is now a skill-based aerial mechanic, where mouse movement on an axis perpendicular to the tongue adjusts the launch angle.
+
+Controls: Finalized into a clear, unambiguous scheme: Left Mouse Button for Jumping, Right Mouse Button for Tongue/Slingshot.
+
+Level Design: Moved from a basic text file to the industry-standard Tiled Map Editor, allowing for much richer and more complex level design.
+
+Camera: Upgraded from a simple vertical-follow to a dynamic camera that smoothly follows on both X and Y axes and is zoomed out for better visibility.
+
+Phase 1: The Core Foundation (Hours 1-8) - ✅ COMPLETE
+Result: A functional character controller with robust physics.
+
+Features Implemented:
+
+Player character with gravity and collision.
+
+Reliable ground detection using a "ground sensor".
+
+Hold-and-release charge jump mechanic.
+
+Wall-bonking physics.
+
+An 'R' key to reset the player's position.
+
+Phase 2: The Gimmick (Hours 9-16) - ✅ COMPLETE
+Result: The core tongue and slingshot mechanics are fully implemented and refined.
+
+Features Implemented:
+
+A player state machine (grounded, airborne, latched).
+
+Anchor points with a maximum TONGUE_RANGE, visualized by an indicator circle.
+
+Right-clicking an anchor (on ground or in air) initiates a latch, halting momentum.
+
+Releasing the right-click performs a powerful slingshot launch towards the anchor.
+
+While latched in the air, mouse movement adjusts the launch angle on an axis perpendicular to the tongue line.
+
+Collision checks during the aiming pivot to prevent glitching into walls.
+
+Phase 3: The World (Hours 17-28) - ✅ COMPLETE
+Result: A scalable world built with a professional toolset, viewed through a dynamic camera.
+
+Features Implemented:
+
+Transitioned level creation from map.txt to the Tiled Map Editor.
+
+Code now loads platforms, anchors, and player start position from a Tiled .lua export.
+
+A dynamic camera that smoothly follows the player on both X and Y axes.
+
+Camera zoom is implemented and controlled via constants.lua.
+
+Camera has boundaries to prevent showing areas outside the map.
+
+Mouse coordinates are correctly translated to world space.
+
+Phase 4: Polish & Puzzles (Hours 29-40) - (Next Steps)
+Goal: Make the game look, sound, and feel good. Add unique interactions.
+
+Puzzle Elements:
+
+Prioritize one puzzle type. The lever and timed platform is a great choice.
+
+Add new object types in Tiled (e.g., a "lever" object) and write the logic to parse them.
+
+Implement the logic: pulling the lever anchor activates the platform for a set time.
+
+Place 2-3 of these puzzles in your level to add variety.
+
+Art Pass:
+
+Replace all your placeholder shapes with actual sprites.
+
+Create a simple frog sprite (a few frames for idle/jump is enough).
+
+Design a simple tile for your platforms.
+
+Create a background that scrolls slower than the foreground (parallax).
+
+Audio Pass:
+
+Use Bfxr to generate sound effects: Jump Charge, Jump Release, Tongue Latch, Slingshot Launch, Land, and a "falling" whoosh.
+
+Find simple, ambient background music.
+
+Phase 5: The Finish Line (Hours 41-48) - (Final Steps)
+Goal: A polished, packaged, and submitted game.
+
+UI & Menus: Create a title screen and a win condition/screen.
+
+Playtesting & Bug Fixing: Play the game from start to finish. Find and fix unfair sections.
+
+Packaging & Submission: Package your .love file and submit it to the jam.
