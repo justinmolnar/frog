@@ -4,4 +4,5 @@ function love.conf(t)
     t.window.title = "Tongue-Tied Ascent"
     t.modules = t.modules or {}
     t.modules.filesystem = true
+    t.console = true
 end

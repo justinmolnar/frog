@@ -3,14 +3,15 @@
 Player = {}
 Player.__index = Player
 
-function Player:new(x, y, C)
+function Player:new(x, y, C, tileWidth, tileHeight)
     local instance = setmetatable({}, Player)
 
     instance.C = C
     instance.x = x
     instance.y = y
-    instance.w = 30
-    instance.h = 50
+    -- Use tile size if provided, otherwise default to 16x16
+    instance.w = tileWidth or 16
+    instance.h = tileHeight or 16
     instance.x_velocity = 0
     instance.y_velocity = 0
     instance.state = "grounded" 
