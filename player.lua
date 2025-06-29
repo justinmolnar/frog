@@ -408,14 +408,16 @@ function Player:releaseCharge(mouseX, mouseY)
     self.charge = 0
 end
 
-function Player:draw()
+function Player:draw(camera, tileWidth, tileHeight)
+    -- Set player color to yellow if they can latch, otherwise default red
     if self.canLatch and self.state ~= "latched" then
-        love.graphics.setColor(1, 1, 0) -- Yellow "ready" indicator
+        love.graphics.setColor(1, 1, 0)
     else
-        love.graphics.setColor(1, 0.3, 0.3) -- Default red
+        love.graphics.setColor(1, 0.3, 0.3)
     end
     love.graphics.rectangle("fill", self.x, self.y, self.w, self.h)
 
+    -- Draw the tongue line if it's active
     if self.tongue.active then
         local playerCenterX = self.x + self.w / 2
         local playerCenterY = self.y + self.h / 2
@@ -426,26 +428,57 @@ function Player:draw()
         love.graphics.setLineWidth(1)
     end
     
-    if self.state == "grounded" or self.state == "airborne" then
+    -- Draw the tongue range indicator if the setting is enabled
+    if Settings.showTongueRange and (self.state == "grounded" or self.state == "airborne") then
         local playerCenterX = self.x + self.w / 2
         local playerCenterY = self.y + self.h / 2
         love.graphics.setColor(1, 0.5, 0.8, 0.2)
         love.graphics.circle("fill", playerCenterX, playerCenterY, self.C.TONGUE_RANGE)
     end
 
+    -- ##### MODIFIED: Highlight logic with new gradient glow #####
     if self.canLatch and self.closestAnchor then
-        love.graphics.setColor(1, 1, 0, 0.5) -- Semi-transparent yellow highlight
-        love.graphics.circle("fill", self.closestAnchor.x, self.closestAnchor.y, self.closestAnchor.radius + 5)
+        local anchor = self.closestAnchor
+        -- Save the current graphics color to restore it later
+        local r,g,b,a = love.graphics.getColor()
+        
+        -- --- Create the gradient glow by stacking circles ---
+        local glow_center_x = anchor.draw_x + tileWidth / 2
+        local glow_center_y = anchor.draw_y + tileHeight / 2
+        
+        -- You can tweak these values to change the glow's appearance
+        local max_glow_radius = tileWidth * 0.9 -- How far the glow extends
+        local num_layers = 6                  -- More layers = smoother gradient
+        local layer_alpha = 0.06              -- Opacity of each individual layer
+        
+        -- Loop from the largest circle to the smallest
+        for i = num_layers, 1, -1 do
+            local radius = max_glow_radius * (i / num_layers)
+            love.graphics.setColor(1, 1, 0, layer_alpha)
+            love.graphics.circle("fill", glow_center_x, glow_center_y, radius)
+        end
+        
+        -- Tint the anchor sprite itself by redrawing it in yellow
+        love.graphics.setColor(1, 1, 0, 1) 
+        love.graphics.draw(anchor.image, anchor.quad, anchor.draw_x, anchor.draw_y)
+        
+        -- Restore the original color to prevent tinting other game elements
+        love.graphics.setColor(r,g,b,a)
     end
 
+    -- Handle drawing for on-ground actions
     if self.state == "grounded" then
         local screenMouseX, screenMouseY = love.mouse.getPosition()
         local worldMouseX, worldMouseY = camera:mouseToWorld(screenMouseX, screenMouseY)
         local playerCenterX = self.x + self.w / 2
         local playerCenterY = self.y + self.h / 2
-        love.graphics.setColor(1, 1, 1, 0.7)
-        love.graphics.line(playerCenterX, playerCenterY, worldMouseX, worldMouseY)
-        if self.isCharging then
+        
+        -- The aiming line remains commented out as requested
+        -- love.graphics.setColor(1, 1, 1, 0.7)
+        -- love.graphics.line(playerCenterX, playerCenterY, worldMouseX, worldMouseY)
+        
+        -- Draw the jump power meter if the setting is enabled
+        if Settings.showJumpPower and self.isCharging then
             local barWidth = 40
             local barHeight = 8
             local barX = self.x + self.w / 2 - barWidth / 2
