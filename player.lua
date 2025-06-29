@@ -47,12 +47,13 @@ function Player:_handleCharging(dt)
 end
 
 function Player:_applyPhysics(dt)
-    if self.state ~= "grounded" then
+    if self.state ~= "grounded" and not DEBUG_FLY_MODE then
         self.y_velocity = self.y_velocity + self.C.GRAVITY * dt
     else
         self.x_velocity = self.x_velocity * self.C.FRICTION
     end
 end
+
 
 function Player:_moveHorizontally(dt, platforms)
     self.x = self.x + self.x_velocity * dt
@@ -142,6 +143,25 @@ function Player:update(dt, platforms, anchors, worldMouseX, worldMouseY)
         end
     end
 end
+
+function Player:fly(dt)
+    self.x_velocity = 0
+    self.y_velocity = 0
+
+    if love.keyboard.isDown("w") then
+        self.y = self.y - self.C.DEBUG_FLY_SPEED * dt
+    end
+    if love.keyboard.isDown("s") then
+        self.y = self.y + self.C.DEBUG_FLY_SPEED * dt
+    end
+    if love.keyboard.isDown("a") then
+        self.x = self.x - self.C.DEBUG_FLY_SPEED * dt
+    end
+    if love.keyboard.isDown("d") then
+        self.x = self.x + self.C.DEBUG_FLY_SPEED * dt
+    end
+end
+
 
 function Player:_checkForLatchableAnchors(anchors, worldMouseX, worldMouseY)
     self.canLatch = false

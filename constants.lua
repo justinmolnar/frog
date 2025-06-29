@@ -17,6 +17,9 @@ return {
     REEL_IN_SPEED = 900,
     LATCH_COYOTE_TIME = 0.5, -- How long (in seconds) the game remembers your latch attempt.
 
+    DEBUG_FLY_SPEED = 500,
+
+
 
     -- Camera Settings
     CAMERA_SMOOTH_UP = 3,

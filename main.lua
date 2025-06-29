@@ -1,5 +1,6 @@
 -- Add this to the top of main.lua
 DEBUG_MODE = true
+DEBUG_FLY_MODE = false -- Add this line
 local loadInfo = {}
 
 require 'Player'
@@ -141,10 +142,15 @@ function love.update(dt)
     map:update(scaledDt)
     
     local worldMouseX, worldMouseY = camera:mouseToWorld(love.mouse.getPosition())
-    player:update(scaledDt, platforms, anchors, worldMouseX, worldMouseY)
+    if DEBUG_FLY_MODE then
+        player:fly(scaledDt)
+    else
+        player:update(scaledDt, platforms, anchors, worldMouseX, worldMouseY)
+    end
     
     camera:update(player.x, player.y, scaledDt)
 end
+
 
 function love.keypressed(key)
     if key == "r" then
@@ -154,6 +160,9 @@ function love.keypressed(key)
     elseif key == "f1" then
         DEBUG_MODE = not DEBUG_MODE  -- Toggle debug mode
         print("Debug mode: " .. (DEBUG_MODE and "ON" or "OFF"))
+    elseif key == "f2" then
+        DEBUG_FLY_MODE = not DEBUG_FLY_MODE  -- Toggle fly mode
+        print("Fly mode: " .. (DEBUG_FLY_MODE and "ON" or "OFF"))
     end
 end
 
@@ -208,9 +217,13 @@ function love.draw()
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.print("State: " .. (player and player.state or "unknown"), 10, 10)
     love.graphics.print("Press F1 to toggle debug", 10, 30)
+    love.graphics.print("Press F2 to toggle fly mode", 10, 50)
     
     if DEBUG_MODE then
-        love.graphics.print("DEBUG MODE ON", 10, 50)
+        love.graphics.print("DEBUG MODE ON", 10, 70)
+    end
+    if DEBUG_FLY_MODE then
+        love.graphics.print("FLY MODE ON", 10, 90)
     end
 end
 
