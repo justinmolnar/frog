@@ -26,11 +26,13 @@ function Player:new(x, y, C, tileWidth, tileHeight)
     instance.canLatch = false
     instance.closestAnchor = nil
     
-    -- THE FIX: Simplified aiming variables
-    instance.latchAngle = 0      -- The angle from anchor to player when latched
-    instance.latchDist = 0       -- The distance from anchor to player when latched
-    instance.aimAdjustment = 0   -- The current aim offset in radians
-    instance.aimAxis = {x=0, y=0} -- The perpendicular axis for aiming
+    instance.latchAngle = 0
+    instance.latchDist = 0
+    instance.aimAdjustment = 0
+    instance.aimAxis = {x=0, y=0}
+
+    -- NEW: To store the launch direction between the "reeling" and "airborne" states.
+    instance.launchVector = nil
 
     return instance
 end
@@ -81,7 +83,8 @@ function Player:_moveVertically(dt, platforms)
 end
 
 function Player:_senseGround(platforms)
-    if self.state == "latched" then return end
+    -- MODIFIED: Prevent this check from running while reeling in.
+    if self.state == "latched" or self.state == "reeling" then return end
 
     local groundSensor = {
         x = self.x + 2,
@@ -109,10 +112,11 @@ end
 function Player:update(dt, platforms, anchors, worldMouseX, worldMouseY)
     self:_handleCharging(dt)
     
+    -- MODIFIED: Add a case for the new "reeling" state.
     if self.state == "latched" then
-        -- THE FIX: We now correctly pass the 'platforms' table to the latched handler.
-        -- The aiming logic is handled separately by love.mousemoved, so we don't need mouse coords here.
         self:_handleLatched(dt, platforms)
+    elseif self.state == "reeling" then
+        self:_handleReeling(dt)
     else
         self:_applyPhysics(dt)
         self:_moveHorizontally(dt, platforms)
@@ -150,8 +154,6 @@ end
 
 function Player:autoLatch()
     if self.canLatch and self.state ~= "latched" then
-        -- THE DEFINITIVE FIX FOR THE JUMP BUG:
-        -- Forcibly cancel any jump charge the moment we latch.
         self.isCharging = false
 
         self.state = "latched"
@@ -167,7 +169,6 @@ function Player:autoLatch()
         self.latchDist = math.sqrt(tongueVecX^2 + tongueVecY^2)
         self.aimAdjustment = 0
 
-        -- Calculate the perpendicular vector for aiming
         if self.latchDist > 0 then
             self.aimAxis.x = -tongueVecY / self.latchDist
             self.aimAxis.y = tongueVecX / self.latchDist
@@ -198,24 +199,32 @@ function Player:tongueShot(mouseX, mouseY, anchors)
 end
 
 function Player:releaseSlingshot()
+    -- REWRITTEN: This function now starts the "reeling" process instead of launching directly.
     if self.state ~= "latched" then return end
 
-    -- Calculate the launch vector based on the player's final pivoted position.
+    -- Calculate the final launch vector based on the player's pivoted position.
     local playerCenterX = self.x + self.w / 2
     local playerCenterY = self.y + self.h / 2
-    
     local dx = self.tongue.anchor.x - playerCenterX
     local dy = self.tongue.anchor.y - playerCenterY
     local dist = math.sqrt(dx^2 + dy^2)
 
     if dist > 0 then
-        self.x_velocity = (dx / dist) * self.C.SLINGSHOT_POWER
-        self.y_velocity = (dy / dist) * self.C.SLINGSHOT_POWER
+        -- Store the normalized launch vector for when we reach the anchor.
+        self.launchVector = { x = dx / dist, y = dy / dist }
+    else
+        -- Fallback in case player is right on top of the anchor.
+        self.launchVector = { x = 0, y = -1 }
     end
+    
+    -- Change state to "reeling" to begin the pull-in animation.
+    self.state = "reeling"
+    self.x_velocity = 0 -- Stop all current momentum.
+    self.y_velocity = 0
 
-    self.state = "airborne"
-    self.tongue.active = false
-    self.tongue.anchor = nil
+    -- Ensure any jump charge is cancelled.
+    self.isCharging = false
+    self.charge = 0
 end
 
 function Player:_checkCollisionAt(x, y, platforms)
@@ -250,15 +259,59 @@ function Player:_handleLatched(dt, platforms)
 
     local finalAngle = self.latchAngle + self.aimAdjustment
     
-    -- Calculate the potential new position for the player
     local nextX = self.tongue.anchor.x + math.cos(finalAngle) * self.latchDist - self.w / 2
     local nextY = self.tongue.anchor.y + math.sin(finalAngle) * self.latchDist - self.h / 2
 
-    -- Check for a collision at the next position BEFORE moving.
     if not self:_checkCollisionAt(nextX, nextY, platforms) then
-        -- If there's no collision, it's safe to move the player.
         self.x = nextX
         self.y = nextY
+    end
+end
+
+function Player:_handleReeling(dt)
+    -- NEW: This function handles the "suck-in" movement toward the anchor.
+    if not self.tongue.anchor then
+        -- Safety check: if we somehow lose the anchor, just become airborne.
+        self.state = "airborne"
+        return
+    end
+
+    local anchorX = self.tongue.anchor.x
+    local anchorY = self.tongue.anchor.y
+    local playerCenterX = self.x + self.w / 2
+    local playerCenterY = self.y + self.h / 2
+    
+    local dx = anchorX - playerCenterX
+    local dy = anchorY - playerCenterY
+    local distToAnchor = math.sqrt(dx^2 + dy^2)
+    
+    local moveDist = self.C.REEL_IN_SPEED * dt
+    
+    -- Check if we are about to reach or pass the anchor in this frame.
+    if distToAnchor <= moveDist or distToAnchor == 0 then
+        -- We've arrived. Now, LAUNCH the player.
+        
+        -- 1. Snap player's final position precisely to the anchor.
+        self.x = anchorX - self.w / 2
+        self.y = anchorY - self.h / 2
+        
+        -- 2. Apply the pre-calculated launch velocity.
+        self.x_velocity = self.launchVector.x * self.C.SLINGSHOT_POWER
+        self.y_velocity = self.launchVector.y * self.C.SLINGSHOT_POWER
+        
+        -- 3. Change state to airborne and clean up.
+        self.state = "airborne"
+        self.tongue.active = false
+        self.tongue.anchor = nil
+        self.launchVector = nil
+        
+    else
+        -- We are still reeling. Move the player along the straight line towards the anchor.
+        local dirX = dx / distToAnchor
+        local dirY = dy / distToAnchor
+        
+        self.x = self.x + dirX * moveDist
+        self.y = self.y + dirY * moveDist
     end
 end
 
@@ -328,7 +381,6 @@ function Player:draw()
         love.graphics.circle("fill", playerCenterX, playerCenterY, self.C.TONGUE_RANGE)
     end
 
-    -- THE CHANGE: Highlight the closest anchor if it's latchable
     if self.canLatch and self.closestAnchor then
         love.graphics.setColor(1, 1, 0, 0.5) -- Semi-transparent yellow highlight
         love.graphics.circle("fill", self.closestAnchor.x, self.closestAnchor.y, self.closestAnchor.radius + 5)

@@ -10,10 +10,11 @@ return {
     -- Player Abilities
     MAX_JUMP_POWER = 700,
     MAX_CHARGE_TIME = 0.8,
-    SLINGSHOT_POWER = 550,
+    SLINGSHOT_POWER = 450,
     TONGUE_RANGE = 125,  -- Reduced for smaller tiles (was 250)
     SLINGSHOT_ADJUST_ANGLE = 15,
     SLINGSHOT_AIM_SENSITIVITY = .25,
+    REEL_IN_SPEED = 900,
 
     -- Camera Settings
     CAMERA_SMOOTH_UP = 3,
@@ -24,4 +25,6 @@ return {
     -- World Settings  
     TILE_WIDTH = 16,   -- Updated to match your map
     TILE_HEIGHT = 16,  -- Updated to match your map
+
+    GAME_SPEED_MULTIPLIER = 0.7,
 }
