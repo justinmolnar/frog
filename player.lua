@@ -30,9 +30,12 @@ function Player:new(x, y, C, tileWidth, tileHeight)
     instance.latchDist = 0
     instance.aimAdjustment = 0
     instance.aimAxis = {x=0, y=0}
-
-    -- NEW: To store the launch direction between the "reeling" and "airborne" states.
+    
     instance.launchVector = nil
+
+    -- NEW: Variables for latch coyote time
+    instance.isAttemptingLatch = false
+    instance.latchAttemptTimer = 0
 
     return instance
 end
@@ -83,7 +86,6 @@ function Player:_moveVertically(dt, platforms)
 end
 
 function Player:_senseGround(platforms)
-    -- MODIFIED: Prevent this check from running while reeling in.
     if self.state == "latched" or self.state == "reeling" then return end
 
     local groundSensor = {
@@ -112,7 +114,6 @@ end
 function Player:update(dt, platforms, anchors, worldMouseX, worldMouseY)
     self:_handleCharging(dt)
     
-    -- MODIFIED: Add a case for the new "reeling" state.
     if self.state == "latched" then
         self:_handleLatched(dt, platforms)
     elseif self.state == "reeling" then
@@ -125,6 +126,21 @@ function Player:update(dt, platforms, anchors, worldMouseX, worldMouseY)
     
     self:_senseGround(platforms)
     self:_checkForLatchableAnchors(anchors, worldMouseX, worldMouseY)
+
+    -- NEW: Latch Coyote Time Logic
+    if self.isAttemptingLatch then
+        -- If we are holding the latch button, check if we entered latchable range.
+        if self.canLatch then
+            self:autoLatch()
+            self.isAttemptingLatch = false -- Stop the attempt once successful.
+        end
+
+        -- Decrement the timer.
+        self.latchAttemptTimer = self.latchAttemptTimer - dt
+        if self.latchAttemptTimer <= 0 then
+            self.isAttemptingLatch = false -- Stop the attempt if time runs out.
+        end
+    end
 end
 
 function Player:_checkForLatchableAnchors(anchors, worldMouseX, worldMouseY)
@@ -153,7 +169,7 @@ function Player:_checkForLatchableAnchors(anchors, worldMouseX, worldMouseY)
 end
 
 function Player:autoLatch()
-    if self.canLatch and self.state ~= "latched" then
+    if self.canLatch and self.state ~= "latched" and self.state ~= "reeling" then
         self.isCharging = false
 
         self.state = "latched"
@@ -169,11 +185,26 @@ function Player:autoLatch()
         self.latchDist = math.sqrt(tongueVecX^2 + tongueVecY^2)
         self.aimAdjustment = 0
 
+        -- Calculate the perpendicular vector for aiming
         if self.latchDist > 0 then
             self.aimAxis.x = -tongueVecY / self.latchDist
             self.aimAxis.y = tongueVecX / self.latchDist
         end
     end
+end
+
+-- NEW: This function starts the coyote time window.
+function Player:startLatchAttempt()
+    -- Don't start a new attempt if already in a slingshot-related state.
+    if self.state == "latched" or self.state == "reeling" then return end
+    
+    self.isAttemptingLatch = true
+    self.latchAttemptTimer = self.C.LATCH_COYOTE_TIME
+end
+
+-- NEW: This function cancels the coyote time window.
+function Player:cancelLatchAttempt()
+    self.isAttemptingLatch = false
 end
 
 function Player:tongueShot(mouseX, mouseY, anchors)
@@ -199,7 +230,6 @@ function Player:tongueShot(mouseX, mouseY, anchors)
 end
 
 function Player:releaseSlingshot()
-    -- REWRITTEN: This function now starts the "reeling" process instead of launching directly.
     if self.state ~= "latched" then return end
 
     -- Calculate the final launch vector based on the player's pivoted position.
@@ -259,17 +289,19 @@ function Player:_handleLatched(dt, platforms)
 
     local finalAngle = self.latchAngle + self.aimAdjustment
     
+    -- Calculate the potential new position for the player
     local nextX = self.tongue.anchor.x + math.cos(finalAngle) * self.latchDist - self.w / 2
     local nextY = self.tongue.anchor.y + math.sin(finalAngle) * self.latchDist - self.h / 2
 
+    -- Check for a collision at the next position BEFORE moving.
     if not self:_checkCollisionAt(nextX, nextY, platforms) then
+        -- If there's no collision, it's safe to move the player.
         self.x = nextX
         self.y = nextY
     end
 end
 
 function Player:_handleReeling(dt)
-    -- NEW: This function handles the "suck-in" movement toward the anchor.
     if not self.tongue.anchor then
         -- Safety check: if we somehow lose the anchor, just become airborne.
         self.state = "airborne"
