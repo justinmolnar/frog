@@ -10,8 +10,9 @@ function Camera:new(mapWidth, mapHeight, C)
     instance.x = 0
     instance.y = 0
     
-    instance.screenWidth = love.graphics.getWidth()
-    instance.screenHeight = love.graphics.getHeight()
+    -- MODIFIED: Use the virtual resolution for all calculations
+    instance.screenWidth = VIRTUAL_WIDTH
+    instance.screenHeight = VIRTUAL_HEIGHT
     
     instance.scale = C.CAMERA_SCALE
     instance.smoothX = C.CAMERA_SMOOTH_X
@@ -25,36 +26,30 @@ function Camera:new(mapWidth, mapHeight, C)
 end
 
 function Camera:update(targetX, targetY, dt)
-    -- Smoothly follow the target on the X axis
+    -- This function remains the same
     self.x = self.x + (targetX - self.x) * self.smoothX * dt
-    
-    -- Smoothly follow the target on the Y axis, with different speeds for up/down
     local ySmooth = self.y > targetY and self.smoothUp or self.smoothDown
     self.y = self.y + (targetY - self.y) * ySmooth * dt
-
-    -- Calculate the current "half-screen" size in world units, accounting for zoom
     local halfScreenWidth = self.screenWidth / (2 * self.scale)
     local halfScreenHeight = self.screenHeight / (2 * self.scale)
-
-    -- Clamp camera position to map boundaries
     self.x = math.max(halfScreenWidth, math.min(self.mapWidth - halfScreenWidth, self.x))
     self.y = math.max(halfScreenHeight, math.min(self.mapHeight - halfScreenHeight, self.y))
 end
 
 function Camera:attach()
+    -- This function remains the same
     love.graphics.push()
-    -- Apply the zoom first
     love.graphics.scale(self.scale)
-    -- Then translate the world so the camera's position is at the center of the screen
     love.graphics.translate(-self.x + self.screenWidth / (2 * self.scale), -self.y + self.screenHeight / (2 * self.scale))
 end
 
 function Camera:detach()
+    -- This function remains the same
     love.graphics.pop()
 end
 
 function Camera:mouseToWorld(mx, my)
-    -- This correctly reverses the transformations from attach()
+    -- MODIFIED: This function now expects virtual mouse coordinates
     local worldX = (mx - self.screenWidth / 2) / self.scale + self.x
     local worldY = (my - self.screenHeight / 2) / self.scale + self.y
     return worldX, worldY

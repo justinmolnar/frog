@@ -5,27 +5,30 @@ local player, camera, map, platforms, anchors, playerStartX, playerStartY
 
 function Game:new()
     local instance = setmetatable({}, Game)
-    
+
     instance.gearButton = {
-        text = "⚙", 
+        text = "⚙",
         x = love.graphics.getWidth() - 54,
-        y = 10, w = 44, h = 44, 
+        y = 10, w = 44, h = 44,
         action = function() GameState.push(Options:new()) end
     }
-    
+
     instance.gearFont = love.graphics.newFont("assets/NotoEmoji.ttf", 32)
     instance.isPaused = false
     instance.is_overlay = false
-    
+
     return instance
 end
 
 function Game:enter()
+    love.mouse.setGrabbed(true)
+    love.mouse.setVisible(true)
+
     map = sti('level1.lua')
     platforms = {}
     anchors = {}
     processTileLayers()
-    
+
     local playerStart = map.layers['meta'].objects[1]
     for i, obj in ipairs(map.layers['meta'].objects) do
         if obj.name == 'player_start' then
@@ -43,20 +46,24 @@ function Game:enter()
 
     camera.x = player.x
     camera.y = player.y
-    
+
     DEBUG_MODE = false
     DEBUG_FLY_MODE = false
 end
 
 function Game:pause()
+    love.mouse.setGrabbed(false)
     self.isPaused = true
 end
 
 function Game:resume()
+    love.mouse.setGrabbed(true)
+    love.mouse.setVisible(true)
     self.isPaused = false
 end
 
 function Game:leave()
+    love.mouse.setGrabbed(false)
     player, camera, map, platforms, anchors, playerStartX, playerStartY = nil, nil, nil, nil, nil, nil, nil
 end
 
@@ -65,21 +72,24 @@ function Game:update(dt)
 
     local scaledDt = dt * CONSTANTS.GAME_SPEED_MULTIPLIER
     map:update(scaledDt)
-    
-    local worldMouseX, worldMouseY = camera:mouseToWorld(love.mouse.getPosition())
+
+    -- Use virtual mouse coordinates for game logic
+    local vMouseX, vMouseY = getVirtualMousePosition()
+    local worldMouseX, worldMouseY = camera:mouseToWorld(vMouseX, vMouseY)
+
     if DEBUG_FLY_MODE then
         player:fly(scaledDt)
     else
         player:update(scaledDt, platforms, anchors, worldMouseX, worldMouseY)
     end
-    
+
     camera:update(player.x, player.y, dt)
 end
 
 function Game:draw()
     love.graphics.setBackgroundColor(0, 0, 0)
     map:draw(-camera.x + camera.screenWidth / (2 * camera.scale), -camera.y + camera.screenHeight / (2 * camera.scale), camera.scale, camera.scale)
-    
+
     camera:attach()
     if DEBUG_MODE then
         drawDebugCollisions()
@@ -98,8 +108,9 @@ function Game:draw()
     do
         local r, g, b, a = love.graphics.getColor()
         local btn = self.gearButton
-        local mx, my = love.mouse.getPosition()
-        local defaultFont = love.graphics.getFont() 
+        -- Use virtual mouse coordinates for UI interaction
+        local mx, my = getVirtualMousePosition()
+        local defaultFont = love.graphics.getFont()
         love.graphics.setFont(self.gearFont)
 
         if mx > btn.x and mx < btn.x + btn.w and my > btn.y and my < btn.y + btn.h then
@@ -116,7 +127,7 @@ end
 
 function Game:keypressed(key)
     if self.isPaused then return end
-    
+
     if key == "r" then
         player:reset(playerStartX, playerStartY)
         camera.x = player.x
@@ -140,12 +151,15 @@ end
 
 function Game:mousepressed(x, y, button)
     if self.isPaused then return end
+    
+    -- Use virtual mouse coordinates for UI clicks
+    local vx, vy = getVirtualMousePosition()
 
     if button == 1 then
         local btn = self.gearButton
-        if x > btn.x and x < btn.x + btn.w and y > btn.y and y < btn.y + btn.h then
+        if vx > btn.x and vx < btn.x + btn.w and vy > btn.y and vy < btn.y + btn.h then
             btn.action()
-            return 
+            return
         end
     end
 
@@ -158,8 +172,10 @@ end
 
 function Game:mousereleased(x, y, button)
     if self.isPaused then return end
-    
-    local worldX, worldY = camera:mouseToWorld(x, y)
+
+    -- Use virtual mouse coordinates to translate to world space
+    local vx, vy = getVirtualMousePosition()
+    local worldX, worldY = camera:mouseToWorld(vx, vy)
 
     if button == 1 and player.state == "grounded" then
         player:releaseCharge(worldX, worldY)
@@ -172,7 +188,6 @@ function Game:mousereleased(x, y, button)
     end
 end
 
--- ##### THIS FUNCTION IS NOW MODIFIED #####
 function processTileLayers()
     if map.layers['ground'] and map.layers['ground'].type == "tilelayer" then
         local layer = map.layers['ground']
@@ -194,13 +209,10 @@ function processTileLayers()
             for x = 1, layer.width do
                 local tile = layer.data[y] and layer.data[y][x]
                 if tile and (tile.properties.anchor == "1" or tile.properties.anchor == true) then
-                    -- Store the tile's visual information so we can redraw it for highlighting
                     table.insert(anchors, {
-                        -- Center point for distance checks
                         x = (x - 1) * map.tilewidth + map.tilewidth / 2,
                         y = (y - 1) * map.tileheight + map.tileheight / 2,
                         radius = map.tilewidth / 2,
-                        -- Top-left corner and sprite info for drawing
                         draw_x = (x - 1) * map.tilewidth,
                         draw_y = (y - 1) * map.tileheight,
                         quad = tile.quad,

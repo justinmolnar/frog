@@ -436,33 +436,37 @@ function Player:draw(camera, tileWidth, tileHeight)
         love.graphics.circle("fill", playerCenterX, playerCenterY, self.C.TONGUE_RANGE)
     end
 
-    -- ##### MODIFIED: Highlight logic with new gradient glow #####
+    -- Highlight the closest anchor if the player can latch to it
     if self.canLatch and self.closestAnchor then
         local anchor = self.closestAnchor
-        -- Save the current graphics color to restore it later
+        -- Save the current graphics state to restore it later
         local r,g,b,a = love.graphics.getColor()
+        local original_blend_mode = love.graphics.getBlendMode()
         
-        -- --- Create the gradient glow by stacking circles ---
+        -- --- Create the gradient glow with Additive Blending ---
+        love.graphics.setBlendMode("add")
+        
         local glow_center_x = anchor.draw_x + tileWidth / 2
         local glow_center_y = anchor.draw_y + tileHeight / 2
         
-        -- You can tweak these values to change the glow's appearance
-        local max_glow_radius = tileWidth * 0.9 -- How far the glow extends
-        local num_layers = 6                  -- More layers = smoother gradient
-        local layer_alpha = 0.06              -- Opacity of each individual layer
+        local max_glow_radius = tileWidth * 0.9
+        local num_layers = 6
+        local layer_alpha = 0.08
         
-        -- Loop from the largest circle to the smallest
         for i = num_layers, 1, -1 do
             local radius = max_glow_radius * (i / num_layers)
             love.graphics.setColor(1, 1, 0, layer_alpha)
             love.graphics.circle("fill", glow_center_x, glow_center_y, radius)
         end
         
+        -- Restore the default blend mode for normal drawing
+        love.graphics.setBlendMode(original_blend_mode)
+        
         -- Tint the anchor sprite itself by redrawing it in yellow
         love.graphics.setColor(1, 1, 0, 1) 
         love.graphics.draw(anchor.image, anchor.quad, anchor.draw_x, anchor.draw_y)
         
-        -- Restore the original color to prevent tinting other game elements
+        -- Restore the original color
         love.graphics.setColor(r,g,b,a)
     end
 

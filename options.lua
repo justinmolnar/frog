@@ -1,48 +1,57 @@
 local Options = {}
 Options.__index = Options
 
-local function newCheckbox(y, text, settingKey)
+local function newCheckbox(y, text, settingKey, action)
     return {
         x = 250, y = y, w = 300, h = 40, box_w = 25,
         text = text,
-        settingKey = settingKey
+        settingKey = settingKey,
+        action = action
     }
 end
 
 function Options:new()
     local instance = setmetatable({}, Options)
-    
+
     instance.checkboxes = {
-        newCheckbox(150, "Show Tongue Range", "showTongueRange"),
-        newCheckbox(200, "Show Jump Power Meter", "showJumpPower"),
-        newCheckbox(250, "Checkpoints", "checkpoints"),
-        newCheckbox(300, "Ironman Mode", "ironman"),
-        newCheckbox(350, "Speedrun Mode", "speedrunMode")
+        newCheckbox(120, "Show Tongue Range", "showTongueRange"),
+        newCheckbox(170, "Show Jump Power Meter", "showJumpPower"),
+        newCheckbox(220, "Checkpoints", "checkpoints"),
+        newCheckbox(270, "Ironman Mode", "ironman"),
+        newCheckbox(320, "Speedrun Mode", "speedrunMode"),
+        newCheckbox(370, "Fullscreen", "fullscreen", function()
+            toggleFullscreen()
+        end)
     }
-    
+
     instance.actionButtons = {
         {text = "Restart", x = 240, y = 450, w = 100, h = 50, action = function() GameState.switch(Game:new()) end},
         {text = "Quit", x = 360, y = 450, w = 100, h = 50, action = function() love.event.quit() end},
         {text = "Back", x = 480, y = 450, w = 100, h = 50, action = function() GameState.pop() end}
     }
-    
-    -- MODIFIED: Designate this as an overlay
+
     instance.is_overlay = true
-    
+
     return instance
+end
+
+function Options:enter()
+    love.mouse.setGrabbed(false)
+    love.mouse.setVisible(true)
 end
 
 function Options:draw()
     love.graphics.setColor(0.1, 0.1, 0.1, 0.9)
-    love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
-    
+    love.graphics.rectangle("fill", 0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT)
+
     love.graphics.setColor(1, 1, 1)
     love.graphics.setFont(love.graphics.newFont(30))
-    love.graphics.printf("Options", 0, 50, love.graphics.getWidth(), "center")
-    
+    love.graphics.printf("Options", 0, 50, VIRTUAL_WIDTH, "center")
+
     love.graphics.setFont(love.graphics.newFont(18))
-    local mx, my = love.mouse.getPosition()
-    
+    -- Use virtual mouse coordinates for UI interaction
+    local mx, my = getVirtualMousePosition()
+
     for _, cb in ipairs(self.checkboxes) do
         if my > cb.y and my < cb.y + cb.h and mx > cb.x and mx < cb.x + cb.w then
             love.graphics.setColor(1, 1, 0)
@@ -55,7 +64,7 @@ function Options:draw()
         end
         love.graphics.printf(cb.text, cb.x + cb.box_w + 10, cb.y + (cb.h - 18) / 2, cb.w, "left")
     end
-    
+
     for _, btn in ipairs(self.actionButtons) do
         if mx > btn.x and mx < btn.x + btn.w and my > btn.y and my < btn.y + btn.h then
             love.graphics.setColor(1, 1, 0)
@@ -68,14 +77,18 @@ function Options:draw()
 end
 
 function Options:mousepressed(x, y, button)
+    -- Use virtual mouse coordinates for UI clicks
+    local vx, vy = getVirtualMousePosition()
+
     if button == 1 then
         for _, cb in ipairs(self.checkboxes) do
-            if y > cb.y and y < cb.y + cb.h and x > cb.x and x < cb.x + cb.w then
+            if vy > cb.y and vy < cb.y + cb.h and vx > cb.x and vx < cb.x + cb.w then
                 Settings[cb.settingKey] = not Settings[cb.settingKey]
+                if cb.action then cb.action() end
             end
         end
         for _, btn in ipairs(self.actionButtons) do
-            if x > btn.x and x < btn.x + btn.w and y > btn.y and y < btn.y + btn.h then
+            if vx > btn.x and vx < btn.x + btn.w and vy > btn.y and vy < btn.y + btn.h then
                 btn.action()
             end
         end

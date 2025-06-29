@@ -2,15 +2,12 @@
 
 local GameState = {}
 
--- The stack holds all our active states. The one on top is the active one.
 local stack = {}
 
--- Gets the currently active state
 function GameState.current()
     return stack[#stack]
 end
 
--- Pushes a new state onto the stack, pausing the one below it.
 function GameState.push(state, ...)
     local old_state = GameState.current()
     if old_state and old_state.pause then
@@ -25,7 +22,6 @@ function GameState.push(state, ...)
     end
 end
 
--- Pops the current state off the stack, resuming the one below it.
 function GameState.pop(...)
     local old_state = GameState.current()
     if old_state and old_state.leave then
@@ -40,7 +36,6 @@ function GameState.pop(...)
     end
 end
 
--- Clears all states and switches to a new one (for Restart or starting a new game).
 function GameState.switch(state, ...)
     while GameState.current() do
         GameState.pop()
@@ -55,27 +50,35 @@ function love.update(dt)
     end
 end
 
--- MODIFIED: This function is now smarter about drawing!
 function love.draw()
-    -- Find the first opaque state from the top of the stack
+    love.graphics.setCanvas(gameCanvas)
+    -- MODIFIED: Clear the canvas to opaque black (r=0, g=0, b=0, a=1)
+    love.graphics.clear(0, 0, 0, 1)
+
     local first_to_draw = #stack
     for i = #stack, 1, -1 do
         local state = stack[i]
-        -- An overlay lets drawing continue to the state below it.
-        -- An opaque state (is_overlay = false) stops the search.
         if not (state.is_overlay and state.is_overlay == true) then
             first_to_draw = i
             break
         end
     end
 
-    -- Draw all states from the first opaque one to the top of the stack
     for i = first_to_draw, #stack do
         local state = stack[i]
         if state.draw then
             state:draw()
         end
     end
+
+    love.graphics.setCanvas()
+
+    local winWidth, winHeight = love.graphics.getDimensions()
+    local scale = math.min(winWidth / VIRTUAL_WIDTH, winHeight / VIRTUAL_HEIGHT)
+    local x = (winWidth - (VIRTUAL_WIDTH * scale)) / 2
+    local y = (winHeight - (VIRTUAL_HEIGHT * scale)) / 2
+    
+    love.graphics.draw(gameCanvas, x, y, 0, scale, scale)
 end
 
 function love.keypressed(key, scancode, isrepeat)
