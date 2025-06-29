@@ -8,6 +8,15 @@ function GameState.current()
     return stack[#stack]
 end
 
+-- NEW: This function safely gets the state below the current one.
+function GameState.getUnderlyingState()
+    if #stack > 1 then
+        return stack[#stack - 1]
+    end
+    return nil
+end
+
+
 function GameState.push(state, ...)
     local old_state = GameState.current()
     if old_state and old_state.pause then
@@ -51,10 +60,6 @@ function love.update(dt)
 end
 
 function love.draw()
-    love.graphics.setCanvas(gameCanvas)
-    -- MODIFIED: Clear the canvas to opaque black (r=0, g=0, b=0, a=1)
-    love.graphics.clear(0, 0, 0, 1)
-
     local first_to_draw = #stack
     for i = #stack, 1, -1 do
         local state = stack[i]
@@ -70,15 +75,6 @@ function love.draw()
             state:draw()
         end
     end
-
-    love.graphics.setCanvas()
-
-    local winWidth, winHeight = love.graphics.getDimensions()
-    local scale = math.min(winWidth / VIRTUAL_WIDTH, winHeight / VIRTUAL_HEIGHT)
-    local x = (winWidth - (VIRTUAL_WIDTH * scale)) / 2
-    local y = (winHeight - (VIRTUAL_HEIGHT * scale)) / 2
-    
-    love.graphics.draw(gameCanvas, x, y, 0, scale, scale)
 end
 
 function love.keypressed(key, scancode, isrepeat)

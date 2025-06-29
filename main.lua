@@ -11,12 +11,12 @@ MainMenu = require 'mainmenu'
 Game = require 'game'
 Options = require 'options' 
 
--- NEW: Define our game's native resolution and main canvas
+-- Define our game's native resolution and main canvas
 VIRTUAL_WIDTH = 800
 VIRTUAL_HEIGHT = 600
 gameCanvas = nil
 
--- NEW: Global function to convert real mouse coords to virtual canvas coords
+-- FIXED AND RESTORED: This critical function is now back and globally accessible.
 function getVirtualMousePosition()
     local mx, my = love.mouse.getPosition()
     local winWidth, winHeight = love.graphics.getDimensions()
@@ -33,12 +33,14 @@ function getVirtualMousePosition()
     return virtualX, virtualY
 end
 
-
+-- FIXED: This function is now correctly global.
 function toggleFullscreen()
     if Settings.fullscreen then
+        -- Switch to fullscreen using the player's desktop dimensions
         local dw, dh = love.window.getDesktopDimensions(1)
         love.window.setMode(dw, dh, {fullscreen = true, vsync = true, resizable = false})
     else
+        -- Switch back to windowed mode using the size from conf.lua
         love.window.setMode(VIRTUAL_WIDTH, VIRTUAL_HEIGHT, {fullscreen = false, vsync = true, resizable = true})
     end
 end
@@ -48,7 +50,9 @@ function love.load()
     gameCanvas = love.graphics.newCanvas(VIRTUAL_WIDTH, VIRTUAL_HEIGHT)
     gameCanvas:setFilter('nearest', 'nearest') -- Use nearest-neighbor scaling for crisp pixels
 
+    -- Apply the fullscreen setting at startup
     toggleFullscreen()
     
+    -- Start the game by creating and switching to a new instance of the MainMenu state.
     GameState.switch(MainMenu:new())
 end
