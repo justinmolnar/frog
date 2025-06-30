@@ -60,6 +60,11 @@ function love.update(dt)
 end
 
 function love.draw()
+    -- Start rendering to the virtual canvas
+    love.graphics.setCanvas(gameCanvas)
+    love.graphics.clear(0,0,0,1) -- Clear with black to avoid artifacts
+
+    -- This is the original logic to draw the current game state(s)
     local first_to_draw = #stack
     for i = #stack, 1, -1 do
         local state = stack[i]
@@ -75,6 +80,18 @@ function love.draw()
             state:draw()
         end
     end
+
+    -- Stop rendering to the virtual canvas
+    love.graphics.setCanvas()
+
+    -- Now, draw the canvas to the actual screen, scaled to fit
+    local winWidth, winHeight = love.graphics.getDimensions()
+    local scale = math.min(winWidth / VIRTUAL_WIDTH, winHeight / VIRTUAL_HEIGHT)
+    local x_offset = (winWidth - (VIRTUAL_WIDTH * scale)) / 2
+    local y_offset = (winHeight - (VIRTUAL_HEIGHT * scale)) / 2
+    
+    love.graphics.setColor(1, 1, 1) -- Reset color to white
+    love.graphics.draw(gameCanvas, x_offset, y_offset, 0, scale, scale)
 end
 
 function love.keypressed(key, scancode, isrepeat)

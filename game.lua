@@ -6,6 +6,11 @@ local player, camera, map, platforms, anchors, playerStartX, playerStartY
 function Game:new()
     local instance = setmetatable({}, Game)
 
+    -- THIS IS THE FIX: Load the images that were removed by mistake
+    instance.backgroundImage = love.graphics.newImage('assets/Backgrounds/Background.png')
+    instance.cloudsImage = love.graphics.newImage('assets/Backgrounds/Clouds.png')
+    instance.cloudOffset = 0
+
     instance.gearButton = {
         text = "⚙",
         x = VIRTUAL_WIDTH - 54,
@@ -13,9 +18,11 @@ function Game:new()
         action = function() GameState.push(Options:new()) end
     }
     
-    instance.checkpointButtons = {
-        place = { x = 10, y = 100, w = 150, h = 30 },
-        return_to = { text = "Return to 🚩", x = 10, y = 140, w = 150, h = 30 }
+    instance.checkpointUI = {
+        placeButton = { text = "Place", x = 10, y = 10, w = 80, h = 35 },
+        returnButton = { text = "Return", x = 155, y = 10, w = 80, h = 35 },
+        flagX = 105, -- Position for the flag icon
+        flagY = 8
     }
 
     -- Create fonts ONCE and store them for reuse.
@@ -42,6 +49,7 @@ function Game:enter()
     end
 
     map = sti('level1.lua')
+    map.layers['ground'].tintcolor = {180, 180, 255, 255}
     platforms = {}
     anchors = {}
     processTileLayers()
@@ -87,6 +95,9 @@ end
 function Game:update(dt)
     if self.isPaused then return end
 
+    -- Correctly increment the cloud offset for animation
+    self.cloudOffset = self.cloudOffset + dt * 20
+
     local scaledDt = dt * CONSTANTS.GAME_SPEED_MULTIPLIER
     map:update(scaledDt)
 
@@ -102,54 +113,61 @@ function Game:update(dt)
     camera:update(player.x, player.y, dt)
 end
 
--- CORRECTED DRAW FUNCTION
 function Game:draw()
-    -- Use a single camera transform for all world objects
-    camera:attach()
+    -- Clear the screen with a black background to start fresh
+    love.graphics.setColor(0, 0, 0, 1)
+    love.graphics.rectangle('fill', 0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT)
 
-    -- Manually draw each map layer. This respects the camera's transform.
-    -- We iterate numerically to control the draw order.
+    -- THIS IS THE FIX: Set the color to a dimmer grey for the background layers
+    love.graphics.setColor(0.7, 0.7, 0.7, 1)
+
+    -- 1. Draw Background (deepest layer)
+    love.graphics.push()
+    local bg_scale = VIRTUAL_HEIGHT / self.backgroundImage:getHeight()
+    local parallax_x = (camera.x * 0.2) % (self.backgroundImage:getWidth() * bg_scale)
+    love.graphics.translate(-parallax_x, 0)
+    love.graphics.draw(self.backgroundImage, 0, 0, 0, bg_scale, bg_scale)
+    love.graphics.draw(self.backgroundImage, self.backgroundImage:getWidth() * bg_scale - 2, 0, 0, bg_scale, bg_scale)
+    love.graphics.pop()
+
+    -- 2. Draw Clouds (middle layer) with corrected animation
+    love.graphics.push()
+    local clouds_scale = VIRTUAL_HEIGHT / self.cloudsImage:getHeight()
+    local scaled_cloud_width = self.cloudsImage:getWidth() * clouds_scale
+    local parallax_clouds_x = (camera.x * 0.5 + self.cloudOffset) % scaled_cloud_width
+    love.graphics.translate(-parallax_clouds_x, 0)
+    love.graphics.draw(self.cloudsImage, 0, 0, 0, clouds_scale, clouds_scale)
+    love.graphics.draw(self.cloudsImage, scaled_cloud_width, 0, 0, clouds_scale, clouds_scale)
+    love.graphics.pop()
+
+    -- THIS IS THE FIX: Reset the color to full white before drawing the game world
+    love.graphics.setColor(1, 1, 1, 1)
+
+    -- 3. Draw Game World (foreground layer) with the camera
+    camera:attach()
     for i = 1, #map.layers do
         local layer = map.layers[i]
-        -- Make sure the layer is visible and we're not drawing the object layer here
         if layer.visible and layer.type ~= "objectgroup" then
             map:drawLayer(layer)
         end
     end
-    
-    -- Draw the placed checkpoint flag in the game world
     if Settings.checkpoints and player.checkpoint then
         love.graphics.setFont(self.emojiFontLarge)
         love.graphics.setColor(1, 1, 1, 1)
-        local flag_width = self.emojiFontLarge:getWidth("🚩")
         love.graphics.print("🚩", player.checkpoint.x, player.checkpoint.y - 16)
     end
-    
-    -- Draw the player and its overlays (like the tongue range circle)
     player:draw(camera, map.tilewidth, map.tileheight)
-    
-    -- Draw debug information inside the camera view
     if DEBUG_MODE then
         drawDebugCollisions()
     end
-
     camera:detach()
-    -- End of world-space drawing
 
-    -- UI Drawing (Screen Space)
+    -- 4. Draw UI (topmost layer, no camera transforms)
     love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.setFont(self.debugFont)
-    love.graphics.print("State: " .. (player and player.state or "unknown"), 10, 10)
-    love.graphics.print("Press F1 to toggle debug", 10, 30)
-    love.graphics.print("Press F2 to toggle fly mode", 10, 50)
-    if DEBUG_MODE then love.graphics.print("DEBUG MODE ON", 10, 70) end
-    if DEBUG_FLY_MODE then love.graphics.print("FLY MODE ON", 10, 90) end
 
-    -- Draw Gear Button
     do
         local btn = self.gearButton
         local mx, my = getVirtualMousePosition()
-        
         love.graphics.setFont(self.emojiFontLarge)
         if mx > btn.x and mx < btn.x + btn.w and my > btn.y and my < btn.y + btn.h then
             love.graphics.setColor(1, 1, 0, 0.8)
@@ -159,53 +177,39 @@ function Game:draw()
         love.graphics.printf(btn.text, btn.x, btn.y + (btn.h - 32) / 2, btn.w, "center")
     end
 
-    -- Draw Checkpoint UI
     if Settings.checkpoints then
         local r, g, b, a = love.graphics.getColor()
         local mx, my = getVirtualMousePosition()
 
-        -- Draw "Place Checkpoint" button
-        do
-            local btn = self.checkpointButtons.place
-            local isDisabled = player.state ~= "grounded" or player.checkpointsAvailable <= 0
-            
-            if isDisabled then love.graphics.setColor(0.5, 0.5, 0.5, 0.8)
-            elseif mx > btn.x and mx < btn.x + btn.w and my > btn.y and my < btn.y + btn.h then love.graphics.setColor(1, 1, 0)
-            else love.graphics.setColor(1, 1, 1) end
+        local placeBtn = self.checkpointUI.placeButton
+        local placeIsDisabled = player.state ~= "grounded" or player.checkpointsAvailable <= 0
+        if placeIsDisabled then love.graphics.setColor(0.5, 0.5, 0.5, 0.8)
+        elseif mx > placeBtn.x and mx < placeBtn.x + placeBtn.w and my > placeBtn.y and my < placeBtn.y + placeBtn.h then love.graphics.setColor(1, 1, 0)
+        else love.graphics.setColor(1, 1, 1) end
+        love.graphics.setLineWidth(2)
+        love.graphics.rectangle("line", placeBtn.x, placeBtn.y, placeBtn.w, placeBtn.h, 5, 5)
+        love.graphics.setFont(self.uiFont)
+        love.graphics.printf(placeBtn.text, placeBtn.x, placeBtn.y + (placeBtn.h - self.uiFont:getHeight())/2, placeBtn.w, "center")
 
-            love.graphics.rectangle("line", btn.x, btn.y, btn.w, btn.h)
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.setFont(self.emojiFontLarge)
+        love.graphics.print("🚩", self.checkpointUI.flagX, self.checkpointUI.flagY, 0, 0.7, 0.7)
+        love.graphics.setFont(self.uiFont)
+        local countText = string.format("%d/%d", player.checkpointsAvailable, player.maxCheckpoints)
+        love.graphics.printf(countText, self.checkpointUI.flagX - 5, self.checkpointUI.flagY + 22, 40, "center")
+        
+        local returnBtn = self.checkpointUI.returnButton
+        local returnIsDisabled = player.checkpoint == nil
+        if returnIsDisabled then love.graphics.setColor(0.5, 0.5, 0.5, 0.8)
+        elseif mx > returnBtn.x and mx < returnBtn.x + returnBtn.w and my > returnBtn.y and my < returnBtn.y + returnBtn.h then love.graphics.setColor(1, 1, 0)
+        else love.graphics.setColor(1, 1, 1) end
+        love.graphics.setLineWidth(2)
+        love.graphics.rectangle("line", returnBtn.x, returnBtn.y, returnBtn.w, returnBtn.h, 5, 5)
+        love.graphics.setFont(self.uiFont)
+        love.graphics.printf(returnBtn.text, returnBtn.x, returnBtn.y + (returnBtn.h - self.uiFont:getHeight())/2, returnBtn.w, "center")
 
-            local textPart = "Place"
-            local countPart = string.format("%d/%d", player.checkpointsAvailable, player.maxCheckpoints)
-            
-            love.graphics.setFont(self.uiFont)
-            love.graphics.print(textPart, btn.x + 8, btn.y + (btn.h - self.uiFont:getHeight()) / 2)
-            love.graphics.print(countPart, btn.x + btn.w - self.uiFont:getWidth(countPart) - 8, btn.y + (btn.h - self.uiFont:getHeight()) / 2)
-            
-            love.graphics.setFont(self.emojiFontSmall)
-            love.graphics.print("🚩", btn.x + 55, btn.y + (btn.h - self.emojiFontSmall:getHeight()) / 2)
-        end
-
-        -- Draw "Return to Checkpoint" button
-        do
-            local btn = self.checkpointButtons.return_to
-            local isDisabled = player.checkpoint == nil
-            
-            if isDisabled then love.graphics.setColor(0.5, 0.5, 0.5, 0.8)
-            elseif mx > btn.x and mx < btn.x + btn.w and my > btn.y and my < btn.y + btn.h then love.graphics.setColor(1, 1, 0)
-            else love.graphics.setColor(1, 1, 1) end
-
-            love.graphics.rectangle("line", btn.x, btn.y, btn.w, btn.h)
-            
-            local textPart = "Return to"
-
-            love.graphics.setFont(self.uiFont)
-            love.graphics.print(textPart, btn.x + 8, btn.y + (btn.h - self.uiFont:getHeight()) / 2)
-
-            love.graphics.setFont(self.emojiFontSmall)
-            love.graphics.print("🚩", btn.x + btn.w - self.emojiFontSmall:getWidth("🚩") - 8, btn.y + (btn.h - self.emojiFontSmall:getHeight())/2)
-        end
         love.graphics.setColor(r, g, b, a)
+        love.graphics.setLineWidth(1)
     end
 end
 
@@ -217,8 +221,7 @@ function Game:keypressed(key)
         player:reset(playerStartX, playerStartY)
         camera.x = player.x
         camera.y = player.y
-    elseif key == "f1" then
-        DEBUG_MODE = not DEBUG_MODE
+    -- F1 functionality has been removed
     elseif key == "f2" then
         DEBUG_FLY_MODE = not DEBUG_FLY_MODE
     elseif key == "escape" then
@@ -247,14 +250,14 @@ function Game:mousepressed(x, y, button)
         end
 
         if Settings.checkpoints then
-            local placeBtn = self.checkpointButtons.place
+            local placeBtn = self.checkpointUI.placeButton
             local placeIsDisabled = player.state ~= "grounded" or player.checkpointsAvailable <= 0
             if not placeIsDisabled and (vx > placeBtn.x and vx < placeBtn.x + placeBtn.w and vy > placeBtn.y and vy < placeBtn.y + placeBtn.h) then
                 player:placeCheckpoint()
                 return
             end
 
-            local returnBtn = self.checkpointButtons.return_to
+            local returnBtn = self.checkpointUI.returnButton
             local returnIsDisabled = player.checkpoint == nil
             if not returnIsDisabled and (vx > returnBtn.x and vx < returnBtn.x + returnBtn.w and vy > returnBtn.y and vy < returnBtn.y + returnBtn.h) then
                 player:returnToCheckpoint()

@@ -17,6 +17,10 @@ function Options:new()
     instance.backgroundImage = love.graphics.newImage('assets/Backgrounds/Background.png')
     instance.cloudsImage = love.graphics.newImage('assets/Backgrounds/Clouds.png')
 
+    -- FIX: Create fonts once and store them
+    instance.titleFont = love.graphics.newFont(30)
+    instance.uiFont = love.graphics.newFont(18)
+
     instance.checkboxes = {
         newCheckbox(120, "Show Tongue Range", "showTongueRange"),
         newCheckbox(170, "Show Jump Power Meter", "showJumpPower"),
@@ -25,9 +29,10 @@ function Options:new()
     }
 
     instance.actionButtons = {
-        {text = "Restart", x = 240, y = 450, w = 100, h = 50, action = function() GameState.switch(Game:new()) end},
-        {text = "Quit", x = 360, y = 450, w = 100, h = 50, action = function() love.event.quit() end},
-        {text = "Back", x = 480, y = 450, w = 100, h = 50, action = function() GameState.pop() end}
+        {text = "Main Menu", x = 290, y = 420, w = 100, h = 50, action = function() GameState.switch(MainMenu:new()) end},
+        {text = "Restart",   x = 410, y = 420, w = 100, h = 50, action = function() GameState.switch(Game:new()) end},
+        {text = "Back",      x = 290, y = 480, w = 100, h = 50, action = function() GameState.pop() end},
+        {text = "Quit",      x = 410, y = 480, w = 100, h = 50, action = function() love.event.quit() end}
     }
 
     instance.is_overlay = true
@@ -43,6 +48,7 @@ end
 function Options:enter()
     love.mouse.setGrabbed(false)
     love.mouse.setVisible(true)
+
 end
 
 function Options:drawConfirmModal()
@@ -70,27 +76,16 @@ function Options:draw()
     local underlyingState = GameState.getUnderlyingState()
     local inGame = (underlyingState and underlyingState.isIronmanRun ~= nil)
 
-    -- If we are not in the game, draw the background images.
-    -- Otherwise, draw the overlay
+    -- Draw the correct background (full image or dimmed overlay)
     if not inGame then
-        -- Calculate the scaling factors for the background
         local bg_w = self.backgroundImage:getWidth()
         local bg_h = self.backgroundImage:getHeight()
-        local scale_x = VIRTUAL_WIDTH / bg_w
-        local scale_y = VIRTUAL_HEIGHT / bg_h
-        love.graphics.draw(self.backgroundImage, 0, 0, 0, scale_x, scale_y)
-
-        -- Calculate the scaling factors for the clouds
-        local clouds_w = self.cloudsImage:getWidth()
-        local clouds_h = self.cloudsImage:getHeight()
-        local clouds_scale_x = VIRTUAL_WIDTH / clouds_w
-        local clouds_scale_y = VIRTUAL_HEIGHT / clouds_h
-        love.graphics.draw(self.cloudsImage, 0, 0, 0, clouds_scale_x, clouds_scale_y)
+        love.graphics.draw(self.backgroundImage, 0, 0, 0, VIRTUAL_WIDTH / bg_w, VIRTUAL_HEIGHT / bg_h)
+        love.graphics.draw(self.cloudsImage, 0, 0, 0, VIRTUAL_WIDTH / self.cloudsImage:getWidth(), VIRTUAL_HEIGHT / self.cloudsImage:getHeight())
     else
         love.graphics.setColor(0.1, 0.1, 0.1, 0.9)
         love.graphics.rectangle("fill", 0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT)
     end
-
 
     if self.showConfirmModal then
         self:drawConfirmModal()
@@ -98,19 +93,18 @@ function Options:draw()
     end
     
     love.graphics.setColor(1, 1, 1)
-    love.graphics.setFont(love.graphics.newFont(30))
+    love.graphics.setFont(self.titleFont)
     love.graphics.printf("Options", 0, 50, VIRTUAL_WIDTH, "center")
 
-    love.graphics.setFont(love.graphics.newFont(18))
+    love.graphics.setFont(self.uiFont)
     local mx, my = getVirtualMousePosition()
 
+    -- Draw Checkboxes
     for _, cb in ipairs(self.checkboxes) do
         local isDisabled = false
-        -- MODIFIED: Dependent options are now disabled if Ironman setting is on.
         if Settings.ironman and (cb.settingKey == "showTongueRange" or cb.settingKey == "showJumpPower" or cb.settingKey == "checkpoints") then
             isDisabled = true
         end
-        -- You can't turn Ironman ON if you're already in a run.
         if inGame and cb.settingKey == "ironman" and not underlyingState.isIronmanRun then
              isDisabled = true
         end
@@ -135,6 +129,10 @@ function Options:draw()
         end
     end
 
+    -- FIX: Reset color after drawing checkboxes to prevent weirdness
+    love.graphics.setColor(1, 1, 1)
+
+    -- Draw Action Buttons
     for _, btn in ipairs(self.actionButtons) do
         if mx > btn.x and mx < btn.x + btn.w and my > btn.y and my < btn.y + btn.h then
             love.graphics.setColor(1, 1, 0)
