@@ -18,10 +18,12 @@ function Game:new()
         return_to = { text = "Return to 🚩", x = 10, y = 140, w = 150, h = 30 }
     }
 
-    -- This font is ONLY for emojis.
-    instance.emojiFont = love.graphics.newFont("assets/NotoEmoji.ttf", 32)
-    -- We will use the default font for all regular text.
-    
+    -- Create fonts ONCE and store them for reuse.
+    instance.uiFont = love.graphics.newFont(14)
+    instance.debugFont = love.graphics.newFont(12)
+    instance.emojiFontLarge = love.graphics.newFont("assets/NotoEmoji.ttf", 32)
+    instance.emojiFontSmall = love.graphics.newFont("assets/NotoEmoji.ttf", 14)
+
     instance.isPaused = false
     instance.is_overlay = false
     instance.isIronmanRun = Settings.ironman
@@ -100,36 +102,43 @@ function Game:update(dt)
     camera:update(player.x, player.y, dt)
 end
 
+-- CORRECTED DRAW FUNCTION
 function Game:draw()
-    love.graphics.setBackgroundColor(0, 0, 0)
-    map:draw(-camera.x + camera.screenWidth / (2 * camera.scale), -camera.y + camera.screenHeight / (2 * camera.scale), camera.scale, camera.scale)
-
+    -- Use a single camera transform for all world objects
     camera:attach()
+
+    -- Manually draw each map layer. This respects the camera's transform.
+    -- We iterate numerically to control the draw order.
+    for i = 1, #map.layers do
+        local layer = map.layers[i]
+        -- Make sure the layer is visible and we're not drawing the object layer here
+        if layer.visible and layer.type ~= "objectgroup" then
+            map:drawLayer(layer)
+        end
+    end
+    
+    -- Draw the placed checkpoint flag in the game world
+    if Settings.checkpoints and player.checkpoint then
+        love.graphics.setFont(self.emojiFontLarge)
+        love.graphics.setColor(1, 1, 1, 1)
+        local flag_width = self.emojiFontLarge:getWidth("🚩")
+        love.graphics.print("🚩", player.checkpoint.x, player.checkpoint.y - 16)
+    end
+    
+    -- Draw the player and its overlays (like the tongue range circle)
+    player:draw(camera, map.tilewidth, map.tileheight)
+    
+    -- Draw debug information inside the camera view
     if DEBUG_MODE then
         drawDebugCollisions()
     end
 
-    -- FIXED: Draw the placed checkpoint flag in the game world
-    if Settings.checkpoints and player.checkpoint then
-        local r,g,b,a = love.graphics.getColor()
-        local defaultFont = love.graphics.getFont()
-        
-        love.graphics.setFont(self.emojiFont)
-        love.graphics.setColor(1, 1, 1, 1)
-        -- Use print and manually center the emoji
-        local flag_width = self.emojiFont:getWidth("🚩")
-        love.graphics.print("🚩", player.checkpoint.x - (flag_width / 2), player.checkpoint.y - 16)
-        
-        love.graphics.setFont(defaultFont)
-        love.graphics.setColor(r,g,b,a)
-    end
-    
-    player:draw(camera, map.tilewidth, map.tileheight)
     camera:detach()
+    -- End of world-space drawing
 
-    -- UI Text
+    -- UI Drawing (Screen Space)
     love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.setFont(love.graphics.newFont(12))
+    love.graphics.setFont(self.debugFont)
     love.graphics.print("State: " .. (player and player.state or "unknown"), 10, 10)
     love.graphics.print("Press F1 to toggle debug", 10, 30)
     love.graphics.print("Press F2 to toggle fly mode", 10, 50)
@@ -138,28 +147,21 @@ function Game:draw()
 
     -- Draw Gear Button
     do
-        local r, g, b, a = love.graphics.getColor()
         local btn = self.gearButton
         local mx, my = getVirtualMousePosition()
-        local defaultFont = love.graphics.getFont()
-        love.graphics.setFont(self.emojiFont)
-
+        
+        love.graphics.setFont(self.emojiFontLarge)
         if mx > btn.x and mx < btn.x + btn.w and my > btn.y and my < btn.y + btn.h then
             love.graphics.setColor(1, 1, 0, 0.8)
         else
             love.graphics.setColor(1, 1, 1, 0.8)
         end
         love.graphics.printf(btn.text, btn.x, btn.y + (btn.h - 32) / 2, btn.w, "center")
-
-        love.graphics.setFont(defaultFont)
-        love.graphics.setColor(r, g, b, a)
     end
 
-    -- FIXED: Complete rewrite of the Checkpoint UI drawing logic
+    -- Draw Checkpoint UI
     if Settings.checkpoints then
         local r, g, b, a = love.graphics.getColor()
-        local defaultFont = love.graphics.newFont(14) -- The font for regular text
-        local emojiFontSmall = love.graphics.newFont("assets/NotoEmoji.ttf", 14) -- The font for emojis
         local mx, my = getVirtualMousePosition()
 
         -- Draw "Place Checkpoint" button
@@ -167,23 +169,21 @@ function Game:draw()
             local btn = self.checkpointButtons.place
             local isDisabled = player.state ~= "grounded" or player.checkpointsAvailable <= 0
             
-            -- Set color for hover/disabled state
             if isDisabled then love.graphics.setColor(0.5, 0.5, 0.5, 0.8)
             elseif mx > btn.x and mx < btn.x + btn.w and my > btn.y and my < btn.y + btn.h then love.graphics.setColor(1, 1, 0)
             else love.graphics.setColor(1, 1, 1) end
 
             love.graphics.rectangle("line", btn.x, btn.y, btn.w, btn.h)
 
-            -- Draw text and symbols separately
             local textPart = "Place"
             local countPart = string.format("%d/%d", player.checkpointsAvailable, player.maxCheckpoints)
             
-            love.graphics.setFont(defaultFont)
-            love.graphics.print(textPart, btn.x + 8, btn.y + (btn.h - defaultFont:getHeight()) / 2)
-            love.graphics.print(countPart, btn.x + btn.w - defaultFont:getWidth(countPart) - 8, btn.y + (btn.h - defaultFont:getHeight()) / 2)
+            love.graphics.setFont(self.uiFont)
+            love.graphics.print(textPart, btn.x + 8, btn.y + (btn.h - self.uiFont:getHeight()) / 2)
+            love.graphics.print(countPart, btn.x + btn.w - self.uiFont:getWidth(countPart) - 8, btn.y + (btn.h - self.uiFont:getHeight()) / 2)
             
-            love.graphics.setFont(emojiFontSmall)
-            love.graphics.print("🚩", btn.x + 55, btn.y + (btn.h - emojiFontSmall:getHeight()) / 2)
+            love.graphics.setFont(self.emojiFontSmall)
+            love.graphics.print("🚩", btn.x + 55, btn.y + (btn.h - self.emojiFontSmall:getHeight()) / 2)
         end
 
         -- Draw "Return to Checkpoint" button
@@ -199,17 +199,16 @@ function Game:draw()
             
             local textPart = "Return to"
 
-            love.graphics.setFont(defaultFont)
-            love.graphics.print(textPart, btn.x + 8, btn.y + (btn.h - defaultFont:getHeight()) / 2)
+            love.graphics.setFont(self.uiFont)
+            love.graphics.print(textPart, btn.x + 8, btn.y + (btn.h - self.uiFont:getHeight()) / 2)
 
-            love.graphics.setFont(emojiFontSmall)
-            love.graphics.print("🚩", btn.x + btn.w - emojiFontSmall:getWidth("🚩") - 8, btn.y + (btn.h - emojiFontSmall:getHeight())/2)
+            love.graphics.setFont(self.emojiFontSmall)
+            love.graphics.print("🚩", btn.x + btn.w - self.emojiFontSmall:getWidth("🚩") - 8, btn.y + (btn.h - self.emojiFontSmall:getHeight())/2)
         end
-
-        love.graphics.setFont(defaultFont)
         love.graphics.setColor(r, g, b, a)
     end
 end
+
 
 function Game:keypressed(key)
     if self.isPaused then return end

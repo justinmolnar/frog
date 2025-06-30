@@ -12,6 +12,10 @@ end
 
 function Options:new()
     local instance = setmetatable({}, Options)
+    
+    -- Load images for the background with the correct paths
+    instance.backgroundImage = love.graphics.newImage('assets/Backgrounds/Background.png')
+    instance.cloudsImage = love.graphics.newImage('assets/Backgrounds/Clouds.png')
 
     instance.checkboxes = {
         newCheckbox(120, "Show Tongue Range", "showTongueRange"),
@@ -63,16 +67,35 @@ function Options:drawConfirmModal()
 end
 
 function Options:draw()
-    love.graphics.setColor(0.1, 0.1, 0.1, 0.9)
-    love.graphics.rectangle("fill", 0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT)
+    local underlyingState = GameState.getUnderlyingState()
+    local inGame = (underlyingState and underlyingState.isIronmanRun ~= nil)
+
+    -- If we are not in the game, draw the background images.
+    -- Otherwise, draw the overlay
+    if not inGame then
+        -- Calculate the scaling factors for the background
+        local bg_w = self.backgroundImage:getWidth()
+        local bg_h = self.backgroundImage:getHeight()
+        local scale_x = VIRTUAL_WIDTH / bg_w
+        local scale_y = VIRTUAL_HEIGHT / bg_h
+        love.graphics.draw(self.backgroundImage, 0, 0, 0, scale_x, scale_y)
+
+        -- Calculate the scaling factors for the clouds
+        local clouds_w = self.cloudsImage:getWidth()
+        local clouds_h = self.cloudsImage:getHeight()
+        local clouds_scale_x = VIRTUAL_WIDTH / clouds_w
+        local clouds_scale_y = VIRTUAL_HEIGHT / clouds_h
+        love.graphics.draw(self.cloudsImage, 0, 0, 0, clouds_scale_x, clouds_scale_y)
+    else
+        love.graphics.setColor(0.1, 0.1, 0.1, 0.9)
+        love.graphics.rectangle("fill", 0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT)
+    end
+
 
     if self.showConfirmModal then
         self:drawConfirmModal()
         return
     end
-    
-    local underlyingState = GameState.getUnderlyingState()
-    local inGame = (underlyingState and underlyingState.isIronmanRun ~= nil)
     
     love.graphics.setColor(1, 1, 1)
     love.graphics.setFont(love.graphics.newFont(30))

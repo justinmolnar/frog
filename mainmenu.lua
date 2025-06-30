@@ -4,6 +4,11 @@ MainMenu.__index = MainMenu
 function MainMenu:new()
     local instance = setmetatable({}, MainMenu)
 
+    -- Load the background and cloud images with the correct paths
+    instance.backgroundImage = love.graphics.newImage('assets/Backgrounds/Background.png')
+    instance.cloudsImage = love.graphics.newImage('assets/Backgrounds/Clouds.png')
+    instance.cloudOffset = 0
+
     instance.buttons = {
         {text = "Start", x = 350, y = 250, w = 100, h = 50, action = function() GameState.switch(Game:new()) end},
         {text = "Options", x = 350, y = 320, w = 100, h = 50, action = function() GameState.push(Options:new()) end}
@@ -19,8 +24,32 @@ function MainMenu:enter()
     love.mouse.setVisible(true)
 end
 
+function MainMenu:update(dt)
+    -- Update the cloud offset for a slow parallax effect
+    self.cloudOffset = (self.cloudOffset + dt * 20) % VIRTUAL_WIDTH
+end
+
 function MainMenu:draw()
-    love.graphics.setBackgroundColor(0.1, 0.1, 0.1)
+    -- Calculate the scaling factors for the background
+    local bg_w = self.backgroundImage:getWidth()
+    local bg_h = self.backgroundImage:getHeight()
+    local scale_x = VIRTUAL_WIDTH / bg_w
+    local scale_y = VIRTUAL_HEIGHT / bg_h
+
+    -- Draw the background, scaled to fit the screen
+    love.graphics.draw(self.backgroundImage, 0, 0, 0, scale_x, scale_y)
+
+    -- Calculate the scaling factors for the clouds
+    local clouds_w = self.cloudsImage:getWidth()
+    local clouds_h = self.cloudsImage:getHeight()
+    local clouds_scale_x = VIRTUAL_WIDTH / clouds_w
+    local clouds_scale_y = VIRTUAL_HEIGHT / clouds_h
+
+    -- Draw the scrolling clouds, scaled to fit the screen
+    love.graphics.draw(self.cloudsImage, -self.cloudOffset, 0, 0, clouds_scale_x, clouds_scale_y)
+    love.graphics.draw(self.cloudsImage, -self.cloudOffset + VIRTUAL_WIDTH, 0, 0, clouds_scale_x, clouds_scale_y)
+
+    -- Draw the rest of the UI
     love.graphics.setColor(1, 1, 1)
     love.graphics.setFont(love.graphics.newFont(30))
     love.graphics.printf("Tongue-Tied Ascent", 0, 100, VIRTUAL_WIDTH, "center")
