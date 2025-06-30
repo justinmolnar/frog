@@ -177,12 +177,12 @@ function Game:draw()
         love.graphics.printf(btn.text, btn.x, btn.y + (btn.h - 32) / 2, btn.w, "center")
     end
 
-    if Settings.checkpoints then
+    if Settings.checkpoints or self.isIronmanRun then
         local r, g, b, a = love.graphics.getColor()
         local mx, my = getVirtualMousePosition()
 
         local placeBtn = self.checkpointUI.placeButton
-        local placeIsDisabled = player.state ~= "grounded" or player.checkpointsAvailable <= 0
+        local placeIsDisabled = player.state ~= "grounded" or player.checkpointsAvailable <= 0 or self.isIronmanRun
         if placeIsDisabled then love.graphics.setColor(0.5, 0.5, 0.5, 0.8)
         elseif mx > placeBtn.x and mx < placeBtn.x + placeBtn.w and my > placeBtn.y and my < placeBtn.y + placeBtn.h then love.graphics.setColor(1, 1, 0)
         else love.graphics.setColor(1, 1, 1) end
@@ -199,7 +199,7 @@ function Game:draw()
         love.graphics.printf(countText, self.checkpointUI.flagX - 5, self.checkpointUI.flagY + 22, 40, "center")
         
         local returnBtn = self.checkpointUI.returnButton
-        local returnIsDisabled = player.checkpoint == nil
+        local returnIsDisabled = player.checkpoint == nil or self.isIronmanRun
         if returnIsDisabled then love.graphics.setColor(0.5, 0.5, 0.5, 0.8)
         elseif mx > returnBtn.x and mx < returnBtn.x + returnBtn.w and my > returnBtn.y and my < returnBtn.y + returnBtn.h then love.graphics.setColor(1, 1, 0)
         else love.graphics.setColor(1, 1, 1) end
@@ -207,6 +207,13 @@ function Game:draw()
         love.graphics.rectangle("line", returnBtn.x, returnBtn.y, returnBtn.w, returnBtn.h, 5, 5)
         love.graphics.setFont(self.uiFont)
         love.graphics.printf(returnBtn.text, returnBtn.x, returnBtn.y + (returnBtn.h - self.uiFont:getHeight())/2, returnBtn.w, "center")
+
+        -- Show warning text in Ironfrog mode
+        if self.isIronmanRun then
+            love.graphics.setColor(1, 0.5, 0.5, 1)
+            love.graphics.setFont(self.uiFont)
+            love.graphics.printf("No Checkpoints In Ironfrog!", 10, 55, 300, "left")
+        end
 
         love.graphics.setColor(r, g, b, a)
         love.graphics.setLineWidth(1)
@@ -249,16 +256,16 @@ function Game:mousepressed(x, y, button)
             return
         end
 
-        if Settings.checkpoints then
+        if Settings.checkpoints or self.isIronmanRun then
             local placeBtn = self.checkpointUI.placeButton
-            local placeIsDisabled = player.state ~= "grounded" or player.checkpointsAvailable <= 0
+            local placeIsDisabled = player.state ~= "grounded" or player.checkpointsAvailable <= 0 or self.isIronmanRun
             if not placeIsDisabled and (vx > placeBtn.x and vx < placeBtn.x + placeBtn.w and vy > placeBtn.y and vy < placeBtn.y + placeBtn.h) then
                 player:placeCheckpoint()
                 return
             end
 
             local returnBtn = self.checkpointUI.returnButton
-            local returnIsDisabled = player.checkpoint == nil
+            local returnIsDisabled = player.checkpoint == nil or self.isIronmanRun
             if not returnIsDisabled and (vx > returnBtn.x and vx < returnBtn.x + returnBtn.w and vy > returnBtn.y and vy < returnBtn.y + returnBtn.h) then
                 player:returnToCheckpoint()
                 return

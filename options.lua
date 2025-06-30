@@ -25,7 +25,7 @@ function Options:new()
         newCheckbox(120, "Show Tongue Range", "showTongueRange"),
         newCheckbox(170, "Show Jump Power Meter", "showJumpPower"),
         newCheckbox(220, "Checkpoints", "checkpoints"),
-        newCheckbox(270, "Ironman Mode", "ironman")
+        newCheckbox(270, "Ironfrog Mode", "ironman")
     }
 
     instance.actionButtons = {
@@ -58,7 +58,7 @@ function Options:drawConfirmModal()
     love.graphics.rectangle("line", 200, 200, 400, 200)
 
     love.graphics.setFont(love.graphics.newFont(16))
-    love.graphics.printf("Disable Ironman mode for this run? \n\nThis cannot be undone.", 200, 240, 400, "center")
+    love.graphics.printf("Disable Ironfrog mode for this run? \n\nThis cannot be undone.", 200, 240, 400, "center")
 
     local mx, my = getVirtualMousePosition()
     for _, btn in ipairs(self.confirmButtons) do
@@ -78,6 +78,7 @@ function Options:draw()
 
     -- Draw the correct background (full image or dimmed overlay)
     if not inGame then
+        love.graphics.setColor(1, 1, 1, 1) -- Ensure full color for background
         local bg_w = self.backgroundImage:getWidth()
         local bg_h = self.backgroundImage:getHeight()
         love.graphics.draw(self.backgroundImage, 0, 0, 0, VIRTUAL_WIDTH / bg_w, VIRTUAL_HEIGHT / bg_h)
@@ -85,8 +86,10 @@ function Options:draw()
     else
         love.graphics.setColor(0.1, 0.1, 0.1, 0.9)
         love.graphics.rectangle("fill", 0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT)
+        love.graphics.setColor(1, 1, 1, 1) -- Reset color after drawing overlay
     end
 
+    -- EARLY RETURN: If showing confirmation modal, only draw that
     if self.showConfirmModal then
         self:drawConfirmModal()
         return
@@ -129,7 +132,7 @@ function Options:draw()
         end
     end
 
-    -- FIX: Reset color after drawing checkboxes to prevent weirdness
+    -- Reset color after drawing checkboxes to prevent weirdness
     love.graphics.setColor(1, 1, 1)
 
     -- Draw Action Buttons
@@ -178,14 +181,14 @@ function Options:mousepressed(x, y, button)
     for _, cb in ipairs(self.checkboxes) do
         if vy > cb.y and vy < cb.y + cb.h and vx > cb.x and vx < cb.x + cb.w then
             
-            -- Logic for Ironman checkbox
+            -- Logic for Ironfrog checkbox
             if cb.settingKey == "ironman" then
                 local isRunLocked = (inGame and underlyingState.isIronmanRun)
 
                 if inGame and not isRunLocked then
-                    -- Cannot turn Ironman ON mid-run. Do nothing.
+                    -- Cannot turn Ironfrog ON mid-run. Do nothing.
                 elseif isRunLocked then
-                    -- Trying to turn Ironman OFF mid-run. Show the modal.
+                    -- Trying to turn Ironfrog OFF mid-run. Show the modal.
                     self.showConfirmModal = true
                 else
                     -- Not in a run, so toggle freely.
@@ -197,7 +200,7 @@ function Options:mousepressed(x, y, button)
                         Settings.checkpoints = false
                     end
                 end
-            -- Logic for other checkboxes (only clickable if Ironman is off)
+            -- Logic for other checkboxes (only clickable if Ironfrog is off)
             elseif not Settings.ironman then
                 Settings[cb.settingKey] = not Settings[cb.settingKey]
             end
